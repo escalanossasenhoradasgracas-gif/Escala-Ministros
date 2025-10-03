@@ -1,6 +1,7 @@
 // @ts-nocheck
 
 import React, { useEffect, useMemo, useState } from "react";
+import { supabase } from "./lib/supabase";
 
 /***********************
  * ESCALA DE MINISTROS — APP (Mobile 390px)
@@ -3645,6 +3646,20 @@ function Shell({ auth, onLogout }: { auth: any; onLogout: () => void }) {
 
 function App() {
   const [auth, setAuth] = useState(() => loadJSON(LS_AUTH, null));
+// ===== TESTE RÁPIDO DO SUPABASE (pode remover depois) =====
+import { supabase } from "./lib/supabaseClient"; // deixe esse import no topo do arquivo
+
+useEffect(() => {
+  (async () => {
+    const { data, error } = await supabase
+      .from("ministers")
+      .select("id, name")
+      .limit(1);
+
+    console.log("SUPABASE TEST =>", { error, data });
+  })();
+}, []);
+// ===== FIM TESTE =====
 
   // persiste toda vez que o auth muda
   useEffect(() => {
