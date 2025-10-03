@@ -2,9 +2,5 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ajustes globais opcionais */
-html,
-body,
-#root {
-  height: 100%;
-}
+/* opcional: fundo geral */
+body { @apply bg-sky-50; }
