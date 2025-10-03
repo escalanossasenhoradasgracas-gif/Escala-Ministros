@@ -3329,40 +3329,61 @@ function Login({ onOk }: { onOk: (auth: any, remember: boolean) => void }) {
   const [remember, setRemember] = React.useState(false); // << novo
   const [error, setError] = React.useState<string | null>(null);
 
-  function doLogin(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
+  async function doLogin(e: React.FormEvent) {
+  e.preventDefault();
+  setError(null);
 
-    const ministers = loadJSON(LS_MINISTERS, []);
-    const u = (ministers as any[]).find((m: any) => {
-      const keys = (m.loginKeys || [m.name, m.email, m.fone]).filter(Boolean);
-      return keys.some(
-        (k: string) => (k || "").toLowerCase() === user.trim().toLowerCase()
-      );
-    });
+  if (!user || !pass) {
+    setError("Preencha usuário e senha");
+    return;
+  }
+
+  try {
+    setLoading(true);
+
+    // chave digitada (nome ou e-mail)
+    const key = user.trim();
+
+    // Busca UM ministro cujo name == key OU email == key
+    const { data: u, error } = await supabase
+      .from('ministers')
+      .select('id,name,email,phone,password,is_admin,active,login_keys')
+      .or(`email.eq.${key},name.eq.${key}`)
+      .maybeSingle();
+
+    if (error) throw error;
 
     if (!u) {
-      setError("Usuário não encontrado.");
+      setError("Usuário não encontrado");
       return;
     }
-    if (u.active === false) {
-      setError("Usuário inativo.");
+    if (!u.active) {
+      setError("Usuário inativo");
       return;
     }
-    if ((u.password || "") !== pass) {
-      setError("Senha inválida.");
+    if (pass !== (u.password ?? "")) {
+      setError("Senha incorreta");
       return;
     }
 
-    const auth = {
-      userKey: u.id,
-      name: u.name || u.id,
-      email: u.email || "",
-      fone: u.fone || "",
-      isAdmin: !!u.isAdmin,
-    };
-    onOk(auth, remember); // << agora envia a escolha de “permanecer conectado”
+    // OK: devolve para o App os dados do usuário autenticado
+    onOk(
+      {
+        id: u.id,
+        name: u.name,
+        loginKeys: u.login_keys ?? [],
+        isAdmin: !!u.is_admin,
+        active: !!u.active,
+        phone: u.phone ?? null,
+      },
+      remember
+    );
+  } catch (err: any) {
+    setError(err?.message ?? String(err));
+  } finally {
+    setLoading(false);
   }
+}
 
   return (
     <div className="max-w-[390px] mx-auto">
