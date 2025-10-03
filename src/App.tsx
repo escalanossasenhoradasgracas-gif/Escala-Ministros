@@ -3334,17 +3334,16 @@ function Login({ onOk }: { onOk: (auth: any, remember: boolean) => void }) {
   setError(null);
 
   if (!user || !pass) {
-    setError("Preencha usuário e senha");
+    setError("Preencha usuário e senha.");
     return;
   }
 
   try {
     setLoading(true);
 
-    // chave digitada (nome ou e-mail)
     const key = user.trim();
 
-    // Busca UM ministro cujo name == key OU email == key
+    // procura por nome OU e-mail na tabela ministers
     const { data: u, error } = await supabase
       .from('ministers')
       .select('id,name,email,phone,password,is_admin,active,login_keys')
@@ -3354,36 +3353,35 @@ function Login({ onOk }: { onOk: (auth: any, remember: boolean) => void }) {
     if (error) throw error;
 
     if (!u) {
-      setError("Usuário não encontrado");
+      setError("Usuário não encontrado.");
       return;
     }
     if (!u.active) {
-      setError("Usuário inativo");
+      setError("Usuário inativo.");
       return;
     }
-    if (pass !== (u.password ?? "")) {
-      setError("Senha incorreta");
+    if ((u.password || "") !== pass) {
+      setError("Senha inválida.");
       return;
     }
 
-    // OK: devolve para o App os dados do usuário autenticado
-    onOk(
-      {
-        id: u.id,
-        name: u.name,
-        loginKeys: u.login_keys ?? [],
-        isAdmin: !!u.is_admin,
-        active: !!u.active,
-        phone: u.phone ?? null,
-      },
-      remember
-    );
+    // mantém o mesmo formato que seu App já espera:
+    const auth = {
+      userKey: u.id,
+      name: u.name || u.id,
+      email: u.email || "",
+      fone: u.phone || "",
+      isAdmin: !!u.is_admin,
+    };
+
+    onOk(auth, remember); // mantém o "permanecer conectado"
   } catch (err: any) {
     setError(err?.message ?? String(err));
   } finally {
     setLoading(false);
   }
 }
+
 
   return (
     <div className="max-w-[390px] mx-auto">
