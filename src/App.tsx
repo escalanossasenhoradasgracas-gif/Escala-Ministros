@@ -3343,10 +3343,9 @@ function Login({ onOk }: { onOk: (auth: any, remember: boolean) => void }) {
 
     const key = user.trim();
 
-    // procura por nome OU e-mail na tabela ministers
     const { data: u, error } = await supabase
-      .from('ministers')
-      .select('id,name,email,phone,password,is_admin,active,login_keys')
+      .from("ministers")
+      .select("id,name,email,phone,password,is_admin,active,login_keys")
       .or(`email.eq.${key},name.eq.${key}`)
       .maybeSingle();
 
@@ -3365,7 +3364,6 @@ function Login({ onOk }: { onOk: (auth: any, remember: boolean) => void }) {
       return;
     }
 
-    // mantém o mesmo formato que seu App já espera:
     const auth = {
       userKey: u.id,
       name: u.name || u.id,
@@ -3374,15 +3372,14 @@ function Login({ onOk }: { onOk: (auth: any, remember: boolean) => void }) {
       isAdmin: !!u.is_admin,
     };
 
-    onOk(auth, remember); // mantém o "permanecer conectado"
+    onOk(auth, remember);
   } catch (err: any) {
     setError(err?.message ?? String(err));
   } finally {
     setLoading(false);
   }
 }
-
-
+  
   return (
     <div className="max-w-[390px] mx-auto">
       <div className="bg-white rounded-2xl border shadow p-4">
