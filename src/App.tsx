@@ -1,7 +1,7 @@
 // @ts-nocheck
 
 import React, { useEffect, useMemo, useState } from "react";
-
+import { supabase } from './lib/supabase';
 /***********************
  * ESCALA DE MINISTROS — APP (Mobile 390px)
  * Mudanças atuais:
