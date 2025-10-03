@@ -1,0 +1,10 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ajustes globais opcionais */
+html,
+body,
+#root {
+  height: 100%;
+}
