@@ -3342,19 +3342,25 @@ function Login({ onOk }: { onOk: (auth: any, remember: boolean) => void }) {
   }
 
   try {
-    // Procura por e-mail, nome OU telefone (campo pode ser phone ou fone)
-    const { data, error } = await supabase
-      .from('ministers')
-      .select('id, name, email, phone, password, is_admin, active, login_keys')
-      .or(`lower(email).eq.${userKey},lower(name).eq.${userKey},phone.eq.${userKey}`)
-      .limit(1);
+   // 1ª tentativa: match EXATO por email, name OU phone
+let { data, error } = await supabase
+  .from('ministers')
+  .select('id, name, email, phone, password, is_admin, active')
+  .or(`email.eq.${userKey},name.eq.${userKey},phone.eq.${userKey}`)
+  .limit(1);
 
-    if (error) {
-      console.error('[LOGIN] erro Supabase:', error);
-      setError("Erro ao consultar usuários.");
-      return;
-    }
-
+// Se não achou ninguém, faz busca "tolerante" (case-insensitive, contém)
+if (!error && (!data || data.length === 0)) {
+  const pattern = `%${userKey}%`;
+  const resp2 = await supabase
+    .from('ministers')
+    .select('id, name, email, phone, password, is_admin, active')
+    .or(`email.ilike.${pattern},name.ilike.${pattern},phone.ilike.${pattern}`)
+    .limit(1);
+  data = resp2.data ?? null;
+  error = resp2.error ?? null;
+} 
+    
     const u = (data && data[0]) || null;
 
     if (!u) {
