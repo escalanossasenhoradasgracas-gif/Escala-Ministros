@@ -3333,7 +3333,7 @@ function Login({ onOk }: { onOk: (auth: any, remember: boolean) => void }) {
   const [remember, setRemember] = React.useState(false); // << novo
   const [error, setError] = React.useState<string | null>(null);
 
- // ===== Login consultando um campo por vez (evita 400 do PostgREST) =====
+ // ===== Login consultando UM campo por vez (sem .or, sem lower) =====
 async function doLogin(e: React.FormEvent) {
   e.preventDefault();
   setError(null);
@@ -3341,18 +3341,21 @@ async function doLogin(e: React.FormEvent) {
   try {
     const login = user.trim();
 
-    // Monta a query e decide 1 único campo (nada de .or(...))
+    // Decide o campo pelo formato do que o usuário digitou
     let query = supabase
       .from('ministers')
       .select('id,name,email,phone,password,is_admin,active')
       .limit(1);
 
     if (login.includes('@')) {
-      query = query.eq('email', login);          // e-mail exato
+      // e-mail exato
+      query = query.ilike('email', login);
     } else if (/^\+?\d[\d\s().-]*$/.test(login)) {
-      query = query.eq('phone', login);          // telefone exato
+      // telefone exato (somente números/sinais comuns)
+      query = query.ilike('phone', login);
     } else {
-      query = query.eq('name', login);           // nome exato
+      // nome exato (se quiser “sem caixa”, troque para .ilike(login))
+      query = query.ilike('name', login);
     }
 
     const { data, error } = await query.maybeSingle();
@@ -3382,7 +3385,6 @@ async function doLogin(e: React.FormEvent) {
       fone: data.phone || '',
       isAdmin: !!data.is_admin,
     };
-
     onOk(auth, remember);
   } catch (err) {
     console.error('[LOGIN] exceção:', err);
@@ -3604,8 +3606,11 @@ function Shell({ auth, onLogout }: { auth: any; onLogout: () => void }) {
 async function syncMinistersFromSupabase() {
   try {
     const { data, error } = await supabase
-      .from("ministers")
-      .select("id,name,email,phone,is_admin,active");
+  .from('ministers')
+  .select('id,name,email,phone,password,is_admin,active')
+  .or(`email.eq.${login},name.eq.${login},phone.eq.${login}`)
+  .limit(1)
+  .maybeSingle();
 
     if (error) {
       console.warn("[SYNC] erro ao ler ministers (segue sem espelho):", error);
