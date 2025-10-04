@@ -3329,56 +3329,63 @@ function Login({ onOk }: { onOk: (auth: any, remember: boolean) => void }) {
   const [remember, setRemember] = React.useState(false); // << novo
   const [error, setError] = React.useState<string | null>(null);
 
-  async function doLogin(e: React.FormEvent) {
+ async function doLogin(e: React.FormEvent) {
   e.preventDefault();
   setError(null);
 
-  if (!user || !pass) {
-    setError("Preencha usuário e senha.");
+  const userKey = (user || "").trim().toLowerCase();
+  const passKey = (pass || "");
+
+  if (!userKey || !passKey) {
+    setError("Informe usuário e senha.");
     return;
   }
 
   try {
-    setLoading(true);
+    // Procura por e-mail, nome OU telefone (campo pode ser phone ou fone)
+    const { data, error } = await supabase
+      .from('ministers')
+      .select('id, name, email, phone, password, is_admin, active, login_keys')
+      .or(`lower(email).eq.${userKey},lower(name).eq.${userKey},phone.eq.${userKey}`)
+      .limit(1);
 
-    const key = user.trim();
+    if (error) {
+      console.error('[LOGIN] erro Supabase:', error);
+      setError("Erro ao consultar usuários.");
+      return;
+    }
 
-    const { data: u, error } = await supabase
-      .from("ministers")
-      .select("id,name,email,phone,password,is_admin,active,login_keys")
-      .or(`email.eq.${key},name.eq.${key}`)
-      .maybeSingle();
-
-    if (error) throw error;
+    const u = (data && data[0]) || null;
 
     if (!u) {
       setError("Usuário não encontrado.");
       return;
     }
-    if (!u.active) {
+    if (u.active === false) {
       setError("Usuário inativo.");
       return;
     }
-    if ((u.password || "") !== pass) {
+    if ((u.password || "") !== passKey) {
       setError("Senha inválida.");
       return;
     }
 
+    // Monta o objeto de autenticação usado pelo App
     const auth = {
       userKey: u.id,
       name: u.name || u.id,
       email: u.email || "",
-      fone: u.phone || "",
+      fone: u.phone || u.fone || "",   // compatibilidade com seu código antigo
       isAdmin: !!u.is_admin,
     };
 
-    onOk(auth, remember);
-  } catch (err: any) {
-    setError(err?.message ?? String(err));
-  } finally {
-    setLoading(false);
+    onOk(auth, remember); // mantém o comportamento de "Permanecer conectado"
+  } catch (e) {
+    console.error('[LOGIN] exceção:', e);
+    setError("Falha inesperada no login.");
   }
 }
+
   
   return (
     <div className="max-w-[390px] mx-auto">
