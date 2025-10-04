@@ -359,11 +359,15 @@ function purgeOldTimes() {
 }
 
 function ensureSeeds() {
+  // mantém apenas os seeds que não são pessoas (horários/extras/etc)
   if (!loadJSON(LS_HORARIOS, []).length)
     saveJSON(LS_HORARIOS, defaultHorariosSeed());
-  if (!loadJSON(LS_MINISTERS, []).length)
-    saveJSON(LS_MINISTERS, [
-      {
+
+  // ❌ não popular mais LS_MINISTERS aqui — vem do Supabase
+  saveJSON(LS_EXTRAS, loadJSON(LS_EXTRAS, {}));
+  saveJSON(LS_ESCALA_CALENDAR, loadJSON(LS_ESCALA_CALENDAR, {}));
+  saveJSON(LS_AVAILABILITY, loadJSON(LS_AVAILABILITY, {}));
+}
         id: "admin",
         name: "Administrador",
         email: "admin@paroquia",
@@ -3337,124 +3341,54 @@ async function doLogin(e: React.FormEvent) {
   try {
     const login = user.trim();
 
-    // Decide o campo: email, phone ou name
+    // monta a query base
     let query = supabase
-      .from('ministers')
-      .select('id,name,email,phone,password,is_admin,active')
+      .from("ministers")
+      .select("id,name,email,phone,password,is_admin,active")
       .limit(1);
 
-    if (login.includes('@')) {
-      query = query.eq('email', login);            // e-mail exato
+    // decide qual CAMPO consultar (um por vez)
+    if (login.includes("@")) {
+      query = query.eq("email", login);       // e-mail exato
     } else if (/^\+?\d[\d\s().-]*$/.test(login)) {
-      query = query.eq('phone', login);            // telefone exato
+      query = query.eq("phone", login);       // telefone exato
     } else {
-      query = query.eq('name', login);             // nome exato
+      query = query.eq("name", login);        // nome exato
     }
 
     const { data, error } = await query.maybeSingle();
 
     if (error) {
-      console.error('[LOGIN] erro Supabase:', error);
-      setError('Erro ao consultar usuários.');
+      console.error("[LOGIN] erro Supabase:", error);
+      setError("Erro ao consultar usuários.");
       return;
     }
-
     if (!data) {
-      setError('Usuário não encontrado.');
+      setError("Usuário não encontrado.");
       return;
     }
-
     if (data.active === false) {
-      setError('Usuário inativo.');
+      setError("Usuário inativo.");
       return;
     }
-
-    if ((data.password || '') !== pass) {
-      setError('Senha inválida.');
+    if ((data.password || "") !== pass) {
+      setError("Senha inválida.");
       return;
     }
 
     const auth = {
       userKey: data.id,
       name: data.name || data.id,
-      email: data.email || '',
-      fone: data.phone || '',       // no front usamos "fone"; na tabela a coluna é "phone"
+      email: data.email || "",
+      fone: data.phone || "",
       isAdmin: !!data.is_admin,
     };
 
     onOk(auth, remember);
   } catch (err) {
-    console.error('[LOGIN] exceção:', err);
-    setError('Erro inesperado ao fazer login.');
+    console.error("[LOGIN] exceção:", err);
+    setError("Erro inesperado ao fazer login.");
   }
-}
-
-  return (
-    <div className="max-w-[390px] mx-auto">
-      <div className="bg-white rounded-2xl border shadow p-4">
-        <div className="text-center mb-3">
-          <img
-            src={LOGO_URL}
-            alt="Paróquia"
-            className="w-32 h-32 rounded-full border mx-auto"
-          />
-          <div className="mt-2 text-sm font-black">
-            MINISTROS EXTRAORDINÁRIOS DA COMUNHÃO
-          </div>
-          <div className="text-[11px] text-gray-600">
-            Paróquia Nossa Senhora das Graças · Franca-SP
-          </div>
-        </div>
-
-        <form onSubmit={doLogin} className="space-y-2">
-          <input
-            value={user}
-            onChange={(e) => setUser((e.target as any).value)}
-            placeholder="Usuário, e-mail ou telefone"
-            className="w-full border rounded-xl px-3 py-2 text-sm"
-          />
-          <input
-            type="password"
-            value={pass}
-            onChange={(e) => setPass((e.target as any).value)}
-            placeholder="Senha"
-            className="w-full border rounded-xl px-3 py-2 text-sm"
-          />
-
-          {/** ⬇⬇⬇ AQUI é “entre senha/erro e o botão Entrar” */}
-          <label className="flex items-center gap-2 text-xs">
-            <input
-              type="checkbox"
-              checked={remember}
-              onChange={(e) => setRemember((e.target as any).checked)}
-            />
-            Permanecer conectado
-          </label>
-          {/** ⬆⬆⬆ */}
-
-          {error && (
-            <div className="text-xs text-red-700 font-semibold">{error}</div>
-          )}
-
-          <button
-            type="submit"
-            className="w-full px-3 py-2 rounded-xl bg-blue-600 text-white text-sm font-bold"
-          >
-            Entrar
-          </button>
-
-          {/* Citação de Santo Agostinho */}
-          <div className="text-center mt-3 text-gray-700 text-sm italic">
-            “Ó sacramento de piedade, ó sinal de unidade, ó vínculo de caridade!
-            Quem quer viver tem onde viver, tem de que viver. Aproxime-se,
-            creia, entre a comunhão para ser vivificado.”
-            <br />
-            <span className="font-bold not-italic">Santo Agostinho</span>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
 }
 
 // =====================
@@ -3668,6 +3602,33 @@ function Shell({ auth, onLogout }: { auth: any; onLogout: () => void }) {
   );
 }
 
+async function syncMinistersFromSupabase() {
+  try {
+    const { data, error } = await supabase
+      .from("ministers")
+      .select("id,name,email,phone,is_admin,active");
+
+    if (error) {
+      console.warn("[SYNC] erro ao ler ministers (segue sem espelho):", error);
+      return;
+    }
+    if (data) {
+      const rows = data.map((m: any) => ({
+        id: m.id,
+        name: m.name || m.id,
+        email: m.email || "",
+        fone: m.phone || "",
+        isAdmin: !!m.is_admin,
+        active: m.active !== false,
+        loginKeys: [m.name, m.email, m.phone].filter(Boolean),
+      }));
+      saveJSON(LS_MINISTERS, rows);
+    }
+  } catch (e) {
+    console.warn("[SYNC] exceção ao espelhar ministers:", e);
+  }
+}
+
 function App() {
   const [auth, setAuth] = useState(() => loadJSON(LS_AUTH, null));
 
@@ -3675,6 +3636,11 @@ function App() {
   useEffect(() => {
     saveJSON(LS_AUTH, auth);
   }, [auth]);
+  
+  // espelha a lista de ministros do Supabase para o localStorage (somente leitura)
+  useEffect(() => {
+    syncMinistersFromSupabase();
+  }, []);
 
   // Logout limpa e “derruba” o shell
   function logout() {
