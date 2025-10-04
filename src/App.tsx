@@ -3333,7 +3333,7 @@ function Login({ onOk }: { onOk: (auth: any, remember: boolean) => void }) {
   const [remember, setRemember] = React.useState(false); // << novo
   const [error, setError] = React.useState<string | null>(null);
 
- // ===== Login consultando UM campo por vez (sem .or, sem lower) =====
+// ===== Login consultando UM campo por vez (sem .or, sem lower) =====
 async function doLogin(e: React.FormEvent) {
   e.preventDefault();
   setError(null);
@@ -3341,21 +3341,18 @@ async function doLogin(e: React.FormEvent) {
   try {
     const login = user.trim();
 
-    // Decide o campo pelo formato do que o usuário digitou
     let query = supabase
       .from('ministers')
       .select('id,name,email,phone,password,is_admin,active')
       .limit(1);
 
     if (login.includes('@')) {
-      // e-mail exato
-      query = query.ilike('email', login);
+      query = query.eq('email', login);              // email exato
     } else if (/^\+?\d[\d\s().-]*$/.test(login)) {
-      // telefone exato (somente números/sinais comuns)
-      query = query.ilike('phone', login);
+      query = query.eq('phone', login);              // telefone exato
     } else {
-      // nome exato (se quiser “sem caixa”, troque para .ilike(login))
-      query = query.ilike('name', login);
+      query = query.eq('name', login);               // nome exato
+      // se preferir ignorar maiúsc./minúsc.: query = query.ilike('name', login);
     }
 
     const { data, error } = await query.maybeSingle();
@@ -3365,18 +3362,9 @@ async function doLogin(e: React.FormEvent) {
       setError('Erro ao consultar usuários.');
       return;
     }
-    if (!data) {
-      setError('Usuário não encontrado.');
-      return;
-    }
-    if (data.active === false) {
-      setError('Usuário inativo.');
-      return;
-    }
-    if ((data.password || '') !== pass) {
-      setError('Senha inválida.');
-      return;
-    }
+    if (!data) { setError('Usuário não encontrado.'); return; }
+    if (data.active === false) { setError('Usuário inativo.'); return; }
+    if ((data.password || '') !== pass) { setError('Senha inválida.'); return; }
 
     const auth = {
       userKey: data.id,
