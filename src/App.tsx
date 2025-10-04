@@ -3341,53 +3341,39 @@ async function doLogin(e: React.FormEvent) {
   try {
     const login = user.trim();
 
-    // monta a query base
+    // Decide o campo: email, phone ou name (uma coluna por vez!)
     let query = supabase
-      .from("ministers")
-      .select("id,name,email,phone,password,is_admin,active")
+      .from('ministers')
+      .select('id,name,email,phone,password,is_admin,active')
       .limit(1);
 
-    // decide qual CAMPO consultar (um por vez)
-    if (login.includes("@")) {
-      query = query.eq("email", login);       // e-mail exato
+    if (login.includes('@')) {
+      query = query.eq('email', login);      // e-mail exato
     } else if (/^\+?\d[\d\s().-]*$/.test(login)) {
-      query = query.eq("phone", login);       // telefone exato
+      query = query.eq('phone', login);      // telefone exato
     } else {
-      query = query.eq("name", login);        // nome exato
+      query = query.eq('name', login);       // nome exato
     }
 
     const { data, error } = await query.maybeSingle();
 
-    if (error) {
-      console.error("[LOGIN] erro Supabase:", error);
-      setError("Erro ao consultar usuários.");
-      return;
-    }
-    if (!data) {
-      setError("Usuário não encontrado.");
-      return;
-    }
-    if (data.active === false) {
-      setError("Usuário inativo.");
-      return;
-    }
-    if ((data.password || "") !== pass) {
-      setError("Senha inválida.");
-      return;
-    }
+    if (error) { console.error('[LOGIN] erro Supabase:', error); setError('Erro ao consultar usuários.'); return; }
+    if (!data) { setError('Usuário não encontrado.'); return; }
+    if (data.active === false) { setError('Usuário inativo.'); return; }
+    if ((data.password || '') !== pass) { setError('Senha inválida.'); return; }
 
     const auth = {
       userKey: data.id,
       name: data.name || data.id,
-      email: data.email || "",
-      fone: data.phone || "",
+      email: data.email || '',
+      fone: data.phone || '',
       isAdmin: !!data.is_admin,
     };
 
     onOk(auth, remember);
   } catch (err) {
-    console.error("[LOGIN] exceção:", err);
-    setError("Erro inesperado ao fazer login.");
+    console.error('[LOGIN] exceção:', err);
+    setError('Erro inesperado ao fazer login.');
   }
 }
 
