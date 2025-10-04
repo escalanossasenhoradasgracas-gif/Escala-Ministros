@@ -3329,70 +3329,66 @@ function Login({ onOk }: { onOk: (auth: any, remember: boolean) => void }) {
   const [remember, setRemember] = React.useState(false); // << novo
   const [error, setError] = React.useState<string | null>(null);
 
- async function doLogin(e: React.FormEvent) {
+ // ===== Login consultando um campo por vez (evita 400 do PostgREST) =====
+async function doLogin(e: React.FormEvent) {
   e.preventDefault();
   setError(null);
 
-  const userKey = (user || "").trim().toLowerCase();
-  const passKey = (pass || "");
-
-  if (!userKey || !passKey) {
-    setError("Informe usuário e senha.");
-    return;
-  }
-
   try {
-   // 1ª tentativa: match EXATO por email, name OU phone
-let { data, error } = await supabase
-  .from('ministers')
-  .select('id, name, email, phone, password, is_admin, active')
-  .or(`email.eq.${userKey},name.eq.${userKey},phone.eq.${userKey}`)
-  .limit(1);
+    const login = user.trim();
 
-// Se não achou ninguém, faz busca "tolerante" (case-insensitive, contém)
-if (!error && (!data || data.length === 0)) {
-  const pattern = `%${userKey}%`;
-  const resp2 = await supabase
-    .from('ministers')
-    .select('id, name, email, phone, password, is_admin, active')
-    .or(`email.ilike.${pattern},name.ilike.${pattern},phone.ilike.${pattern}`)
-    .limit(1);
-  data = resp2.data ?? null;
-  error = resp2.error ?? null;
-} 
-    
-    const u = (data && data[0]) || null;
+    // Decide o campo: email, phone ou name
+    let query = supabase
+      .from('ministers')
+      .select('id,name,email,phone,password,is_admin,active')
+      .limit(1);
 
-    if (!u) {
-      setError("Usuário não encontrado.");
-      return;
+    if (login.includes('@')) {
+      query = query.eq('email', login);            // e-mail exato
+    } else if (/^\+?\d[\d\s().-]*$/.test(login)) {
+      query = query.eq('phone', login);            // telefone exato
+    } else {
+      query = query.eq('name', login);             // nome exato
     }
-    if (u.active === false) {
-      setError("Usuário inativo.");
-      return;
-    }
-    if ((u.password || "") !== passKey) {
-      setError("Senha inválida.");
+
+    const { data, error } = await query.maybeSingle();
+
+    if (error) {
+      console.error('[LOGIN] erro Supabase:', error);
+      setError('Erro ao consultar usuários.');
       return;
     }
 
-    // Monta o objeto de autenticação usado pelo App
+    if (!data) {
+      setError('Usuário não encontrado.');
+      return;
+    }
+
+    if (data.active === false) {
+      setError('Usuário inativo.');
+      return;
+    }
+
+    if ((data.password || '') !== pass) {
+      setError('Senha inválida.');
+      return;
+    }
+
     const auth = {
-      userKey: u.id,
-      name: u.name || u.id,
-      email: u.email || "",
-      fone: u.phone || u.fone || "",   // compatibilidade com seu código antigo
-      isAdmin: !!u.is_admin,
+      userKey: data.id,
+      name: data.name || data.id,
+      email: data.email || '',
+      fone: data.phone || '',       // no front usamos "fone"; na tabela a coluna é "phone"
+      isAdmin: !!data.is_admin,
     };
 
-    onOk(auth, remember); // mantém o comportamento de "Permanecer conectado"
-  } catch (e) {
-    console.error('[LOGIN] exceção:', e);
-    setError("Falha inesperada no login.");
+    onOk(auth, remember);
+  } catch (err) {
+    console.error('[LOGIN] exceção:', err);
+    setError('Erro inesperado ao fazer login.');
   }
 }
 
-  
   return (
     <div className="max-w-[390px] mx-auto">
       <div className="bg-white rounded-2xl border shadow p-4">
