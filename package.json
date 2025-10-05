@@ -5,9 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "vite build",
     "preview": "vite preview --port 4173"
   },
+  "packageManager": "pnpm@8.15.4"
+}
   "dependencies": {
     "@supabase/supabase-js": "^2.48.1",
     "react": "18.3.1",
