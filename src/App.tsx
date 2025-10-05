@@ -1,5 +1,20 @@
 // @ts-nocheck
 
+// DEBUG — loga envs sem expor a chave inteira
+try {
+  const qs = new URLSearchParams(window.location.search);
+  if (qs.get('debug') === '1') {
+    // esses logs só aparecem quando a URL tiver ?debug=1
+    // Ex.: https://seu-site.vercel.app/?debug=1
+    // eslint-disable-next-line
+    console.log('[DBG] SUPABASE URL:', import.meta.env.VITE_SUPABASE_URL);
+    // eslint-disable-next-line
+    console.log('[DBG] SUPABASE KEY (prefix):', (import.meta.env.VITE_SUPABASE_ANON_KEY || '').slice(0, 15));
+  }
+} catch (e) {
+  // nada
+}
+
 import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from './lib/supabase';
 /***********************
